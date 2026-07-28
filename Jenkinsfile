@@ -12,7 +12,7 @@ pipeline {
 
   environment {
     REGISTRY     = 'ghcr.io'
-    IMAGE_OWNER  = 'OWNER'                     // GitHub user/org that owns the package
+    IMAGE_OWNER  = 'sriindus'                     // GitHub user/org that owns the package
     IMAGE_NAME   = 'hello-world-frontend'
     IMAGE_REPO   = "${REGISTRY}/${IMAGE_OWNER}/${IMAGE_NAME}"
     IMAGE_TAG    = "${env.GIT_COMMIT ? env.GIT_COMMIT.take(7) : env.BUILD_NUMBER}"

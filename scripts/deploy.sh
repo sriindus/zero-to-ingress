@@ -8,7 +8,7 @@ cd "$(dirname "$0")/.."
 
 NAMESPACE="${K8S_NAMESPACE:-hello-world}"
 REGISTRY="${REGISTRY:-ghcr.io}"
-IMAGE_OWNER="${IMAGE_OWNER:-OWNER}"
+IMAGE_OWNER="${IMAGE_OWNER:-sriindus}"
 IMAGE_NAME="${IMAGE_NAME:-hello-world-frontend}"
 IMAGE_REPO="${IMAGE_REPO:-$REGISTRY/$IMAGE_OWNER/$IMAGE_NAME}"
 

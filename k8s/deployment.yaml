@@ -43,7 +43,7 @@ spec:
       containers:
         - name: web
           # Replace with your registry path; the pipeline overwrites this tag per build.
-          image: ghcr.io/OWNER/hello-world-frontend:latest
+          image: ghcr.io/sriindus/hello-world-frontend:latest
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

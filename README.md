@@ -30,20 +30,19 @@ jenkins/                Dockerfile + compose to run a Jenkins controller locally
 scripts/                build.sh, deploy.sh, kind-cluster.sh, github-init.sh
 ```
 
-## Before you start: two placeholders
+## Coordinates
 
-Replace `OWNER` with your GitHub username/org in:
+- Repository: <https://github.com/sriindus/zero-to-ingress>
+- Image: `ghcr.io/sriindus/hello-world-frontend`
+- Ingress host: `hello-world.local` — change it in [k8s/ingress.yaml](k8s/ingress.yaml)
+  when you have a real domain
 
-- [k8s/deployment.yaml](k8s/deployment.yaml) (`image:`)
-- [k8s/kustomization.yaml](k8s/kustomization.yaml) (`images[].name`)
-- [Jenkinsfile](Jenkinsfile) (`IMAGE_OWNER`)
-
-And pick your hostname in [k8s/ingress.yaml](k8s/ingress.yaml) — it ships as
-`hello-world.local` for local use.
+If you fork this under a different account, the image owner appears in
+[k8s/deployment.yaml](k8s/deployment.yaml), [k8s/kustomization.yaml](k8s/kustomization.yaml),
+[Jenkinsfile](Jenkinsfile) and the [scripts/](scripts/):
 
 ```bash
-# one-liner for the image owner
-grep -rl 'OWNER' k8s Jenkinsfile scripts | xargs sed -i '' 's|OWNER|your-github-user|g'
+grep -rl 'sriindus' k8s Jenkinsfile scripts | xargs sed -i '' 's|sriindus|your-github-user|g'
 ```
 
 ## 1. Run it locally
@@ -108,18 +107,41 @@ kubectl -n hello-world create secret docker-registry ghcr-pull \
 
 ## 4. Push to GitHub
 
+The repo exists and `origin` is already configured, so this is just an auth question.
+Store the token in the macOS keychain — never in a file inside the repo, and never in a
+shell command you'd rather not leave in `~/.zsh_history`:
+
 ```bash
-brew install gh && gh auth login
-./scripts/github-init.sh                     # REPO_NAME=... VISIBILITY=private to override
+git config --global credential.helper osxkeychain
+git push -u origin main
+# Username: sriindus
+# Password: paste the personal access token (not your account password)
 ```
 
-Or manually:
+The keychain caches it after the first push, so later pushes are silent.
+
+If you prefer the GitHub CLI (also handy for release and PR work later):
 
 ```bash
-git init -b main && git add -A && git commit -m "initial commit"
-git remote add origin git@github.com:YOUR_USER/zero-to-ingress.git
+brew install gh
+gh auth login                                # choose HTTPS, paste the token when asked
+gh auth setup-git                            # makes gh the git credential helper
 git push -u origin main
 ```
+
+[scripts/github-init.sh](scripts/github-init.sh) handles the create-and-push case from
+scratch, for the next project.
+
+### Token scopes
+
+| Scope | Needed for |
+| --- | --- |
+| `repo` | pushing this repository |
+| `write:packages` | pushing the container image to GHCR |
+| `read:packages` | letting the cluster pull the image |
+
+A fine-grained token works too: **Contents: read/write** on this repo, plus
+**Packages: read/write** at the account level.
 
 ## 5. Jenkins pipeline
 
@@ -189,5 +211,6 @@ kubectl -n ingress-nginx logs -l app.kubernetes.io/component=controller
 ```
 
 - **Ingress 404** — the `Host` header must match `k8s/ingress.yaml`; check `/etc/hosts`.
-- **`ImagePullBackOff`** — `OWNER` still unreplaced, or a pull secret is missing.
+- **`ImagePullBackOff`** — the image isn't pushed yet, or a pull secret is missing for
+  the private GHCR package.
 - **HPA shows `<unknown>`** — install metrics-server.

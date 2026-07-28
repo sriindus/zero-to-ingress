@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Build (and optionally push) the container image.
-#   ./scripts/build.sh                 -> builds ghcr.io/OWNER/hello-world-frontend:<git-sha>
+#   ./scripts/build.sh                 -> builds ghcr.io/sriindus/hello-world-frontend:<git-sha>
 #   PUSH=1 ./scripts/build.sh          -> also pushes
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
 REGISTRY="${REGISTRY:-ghcr.io}"
-IMAGE_OWNER="${IMAGE_OWNER:-OWNER}"
+IMAGE_OWNER="${IMAGE_OWNER:-sriindus}"
 IMAGE_NAME="${IMAGE_NAME:-hello-world-frontend}"
 IMAGE_REPO="${IMAGE_REPO:-$REGISTRY/$IMAGE_OWNER/$IMAGE_NAME}"
 IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD 2>/dev/null || echo dev)}"

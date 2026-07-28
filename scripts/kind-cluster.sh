@@ -6,7 +6,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 CLUSTER="${CLUSTER:-hello-world}"
-IMAGE_REPO="${IMAGE_REPO:-ghcr.io/OWNER/hello-world-frontend}"
+IMAGE_REPO="${IMAGE_REPO:-ghcr.io/sriindus/hello-world-frontend}"
 IMAGE_TAG="${IMAGE_TAG:-dev}"
 
 if ! kind get clusters 2>/dev/null | grep -qx "$CLUSTER"; then

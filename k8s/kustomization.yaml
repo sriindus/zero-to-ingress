@@ -19,5 +19,5 @@ commonLabels:
 
 # `kustomize edit set image` in the pipeline rewrites this per build.
 images:
-  - name: ghcr.io/OWNER/hello-world-frontend
+  - name: ghcr.io/sriindus/hello-world-frontend
     newTag: latest
