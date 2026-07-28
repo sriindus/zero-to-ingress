@@ -1,4 +1,4 @@
-# hello-world-k8s
+# zero-to-ingress
 
 A Node.js "Hello World" front end, containerized on Alpine Linux, deployed to Kubernetes
 behind an nginx ingress, and shipped by a Jenkins pipeline. Every component is open source.
@@ -117,7 +117,7 @@ Or manually:
 
 ```bash
 git init -b main && git add -A && git commit -m "initial commit"
-git remote add origin git@github.com:YOUR_USER/hello-world-k8s.git
+git remote add origin git@github.com:YOUR_USER/zero-to-ingress.git
 git push -u origin main
 ```
 

@@ -5,8 +5,9 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-REPO_NAME="${REPO_NAME:-hello-world-k8s}"
+REPO_NAME="${REPO_NAME:-zero-to-ingress}"
 VISIBILITY="${VISIBILITY:-public}"   # public | private
+DESCRIPTION="${DESCRIPTION:-Node.js hello-world taken from npm start to a live Kubernetes ingress, with Docker, Kustomize and a Jenkins pipeline}"
 
 command -v gh >/dev/null 2>&1 || {
   echo "gh not found. Install it: brew install gh && gh auth login" >&2
@@ -26,7 +27,9 @@ if git remote get-url origin >/dev/null 2>&1; then
   git push -u origin main
 else
   echo "==> creating $VISIBILITY repo '$REPO_NAME' and pushing"
-  gh repo create "$REPO_NAME" "--$VISIBILITY" --source=. --remote=origin --push
+  gh repo create "$REPO_NAME" "--$VISIBILITY" \
+    --description "$DESCRIPTION" \
+    --source=. --remote=origin --push
 fi
 
 echo "==> done: $(git remote get-url origin)"
