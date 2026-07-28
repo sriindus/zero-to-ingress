@@ -13,9 +13,14 @@ resources:
   - hpa.yaml
   - poddisruptionbudget.yaml
 
-commonLabels:
-  app.kubernetes.io/part-of: hello-world
-  app.kubernetes.io/managed-by: kustomize
+# includeSelectors keeps these in the Deployment's matchLabels, matching what the
+# deprecated commonLabels did. It must stay true: spec.selector is immutable, so
+# flipping it would break `kubectl apply` against an already-deployed cluster.
+labels:
+  - includeSelectors: true
+    pairs:
+      app.kubernetes.io/part-of: hello-world
+      app.kubernetes.io/managed-by: kustomize
 
 # `kustomize edit set image` in the pipeline rewrites this per build.
 images:

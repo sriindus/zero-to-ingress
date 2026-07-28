@@ -9,9 +9,15 @@ CLUSTER="${CLUSTER:-hello-world}"
 IMAGE_REPO="${IMAGE_REPO:-ghcr.io/sriindus/hello-world-frontend}"
 IMAGE_TAG="${IMAGE_TAG:-dev}"
 
+# Host ports the ingress is published on. Defaults are unprivileged because macOS
+# (and colima's port forwarder) cannot bind ports below 1024 without root.
+# On Linux, HTTP_PORT=80 HTTPS_PORT=443 works and gives you clean URLs.
+HTTP_PORT="${HTTP_PORT:-8080}"
+HTTPS_PORT="${HTTPS_PORT:-8443}"
+
 if ! kind get clusters 2>/dev/null | grep -qx "$CLUSTER"; then
-  echo "==> creating kind cluster '$CLUSTER' with ingress-ready node"
-  kind create cluster --name "$CLUSTER" --config - <<'EOF'
+  echo "==> creating kind cluster '$CLUSTER' (ingress on :$HTTP_PORT and :$HTTPS_PORT)"
+  kind create cluster --name "$CLUSTER" --config - <<EOF
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
@@ -24,10 +30,10 @@ nodes:
             node-labels: "ingress-ready=true"
     extraPortMappings:
       - containerPort: 80
-        hostPort: 80
+        hostPort: ${HTTP_PORT}
         protocol: TCP
       - containerPort: 443
-        hostPort: 443
+        hostPort: ${HTTPS_PORT}
         protocol: TCP
   - role: worker
 EOF
@@ -47,10 +53,13 @@ echo "==> deploying"
 kubectl apply -k k8s/
 kubectl -n hello-world rollout status deployment/hello-world-frontend --timeout=180s
 
-cat <<'EOF'
+cat <<EOF
 
 Done. Add the host entry once:
   echo "127.0.0.1 hello-world.local" | sudo tee -a /etc/hosts
 
-Then open http://hello-world.local
+Then open http://hello-world.local:${HTTP_PORT}
+
+No sudo? The Host header is what matters, so this works too:
+  curl -H 'Host: hello-world.local' http://127.0.0.1:${HTTP_PORT}/api/hello
 EOF

@@ -67,13 +67,24 @@ and `/tmp` as the only writable mount.
 
 ## 3. Deploy to Kubernetes
 
-Any cluster works. For a throwaway local one:
+Any cluster works. For a throwaway local one on macOS:
 
 ```bash
-brew install kind kubectl kustomize          # macOS
-./scripts/kind-cluster.sh                    # creates cluster + ingress-nginx + deploys
+brew install colima docker kubectl kustomize kind
+colima start --cpu 4 --memory 6 --disk 30     # MIT-licensed Docker Desktop alternative
+IMAGE_TAG=dev ./scripts/kind-cluster.sh       # cluster + ingress-nginx + deploy
+```
+
+The ingress lands on `localhost:8080` — macOS won't let a non-root process bind port 80,
+so the script publishes 8080/8443 by default. On Linux, `HTTP_PORT=80 HTTPS_PORT=443
+./scripts/kind-cluster.sh` gives you clean URLs.
+
+```bash
+# no sudo needed — the Host header is what the ingress routes on
+curl -H 'Host: hello-world.local' http://127.0.0.1:8080/api/hello
+
+# or, for a browsable URL: http://hello-world.local:8080
 echo "127.0.0.1 hello-world.local" | sudo tee -a /etc/hosts
-open http://hello-world.local
 ```
 
 Against an existing cluster:
