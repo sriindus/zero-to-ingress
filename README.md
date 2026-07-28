@@ -247,6 +247,37 @@ scratch, for the next project.
 A fine-grained token works too: **Contents: read/write** on this repo, plus
 **Packages: read/write** at the account level.
 
+### Repository protections in effect
+
+The repo is public, so it is already read-only to everyone but the owner — forks and pull
+requests are the only way in, and merging is the maintainer's call. On top of that:
+
+| Setting | State | Effect |
+| --- | --- | --- |
+| Force pushes to `main` | blocked | `git push --force` is rejected |
+| Deleting `main` | blocked | the branch cannot be removed |
+| Applies to admins | yes | the two rules above cover the owner too |
+| Pull requests / approvals | not required | direct pushes to `main` still work |
+| Secret scanning + push protection | enabled | a commit containing a token is refused |
+| Dependabot alerts | enabled | notifies on vulnerable dependencies |
+
+Reproduce on a fork of your own:
+
+```bash
+gh api -X PUT repos/OWNER/REPO/branches/main/protection --input - <<'JSON'
+{"required_status_checks":null,"enforce_admins":true,
+ "required_pull_request_reviews":null,"restrictions":null,
+ "allow_force_pushes":false,"allow_deletions":false}
+JSON
+gh api -X PUT repos/OWNER/REPO/vulnerability-alerts
+```
+
+To force-push in an emergency, lift protection, push, then restore it:
+
+```bash
+gh api -X DELETE repos/sriindus/zero-to-ingress/branches/main/protection
+```
+
 ## 6. Jenkins pipeline
 
 Run a controller locally (Docker-outside-of-Docker, so it builds with your host daemon):
