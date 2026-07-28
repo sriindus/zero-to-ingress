@@ -1,0 +1,17 @@
+**/node_modules
+**/npm-debug.log*
+**/.git
+**/.gitignore
+**/.DS_Store
+**/.env
+**/.env.*
+**/coverage
+**/test
+k8s
+jenkins
+scripts
+docs
+README.md
+instructions.txt
+docker-compose.yml
+Jenkinsfile

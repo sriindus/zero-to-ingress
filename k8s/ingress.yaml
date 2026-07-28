@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hello-world-frontend
+  namespace: hello-world
+  labels:
+    app.kubernetes.io/name: hello-world-frontend
+  annotations:
+    # ingress-nginx (Apache-2.0) — open source controller
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-body-size: 1m
+    # Uncomment once cert-manager is installed to get a Let's Encrypt certificate:
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: hello-world.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hello-world-frontend
+                port:
+                  name: http
+  # Enable together with the cert-manager annotation above for HTTPS:
+  # tls:
+  #   - hosts:
+  #       - hello-world.local
+  #     secretName: hello-world-frontend-tls

@@ -1,0 +1,25 @@
+# Local Jenkins controller for this pipeline: docker compose -f jenkins/docker-compose.yml up -d
+# Then open http://localhost:8080 and use the password printed by:
+#   docker compose -f jenkins/docker-compose.yml exec jenkins \
+#     cat /var/jenkins_home/secrets/initialAdminPassword
+services:
+  jenkins:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: jenkins-devops-k8s:local
+    container_name: jenkins
+    user: root                       # needed to reach the mounted Docker socket
+    ports:
+      - "8080:8080"                  # web UI
+      - "50000:50000"                # inbound agents
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      # Docker-outside-of-Docker: build images using the host daemon
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      JAVA_OPTS: -Djenkins.install.runSetupWizard=true
+    restart: unless-stopped
+
+volumes:
+  jenkins_home:

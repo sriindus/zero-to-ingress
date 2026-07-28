@@ -1,0 +1,19 @@
+{
+  "name": "hello-world-frontend",
+  "version": "1.0.0",
+  "description": "Hello World front end application on Node.js, containerized and deployed to Kubernetes",
+  "license": "MIT",
+  "private": true,
+  "main": "server.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

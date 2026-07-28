@@ -1,0 +1,13 @@
+# Local smoke test of the exact production image: docker compose up --build
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hello-world-frontend:local
+    ports:
+      - "3000:3000"
+    environment:
+      APP_ENV: docker-compose
+      APP_MESSAGE: Hello World
+    restart: unless-stopped

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hello World</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="card">
+      <h1 id="message">Hello World</h1>
+      <p class="subtitle">Node.js front end running in Kubernetes</p>
+
+      <dl class="meta">
+        <div><dt>Environment</dt><dd id="environment">&mdash;</dd></div>
+        <div><dt>Version</dt><dd id="version">&mdash;</dd></div>
+        <div><dt>Pod</dt><dd id="hostname">&mdash;</dd></div>
+        <div><dt>Served at</dt><dd id="timestamp">&mdash;</dd></div>
+      </dl>
+
+      <p id="status" class="status" role="status"></p>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

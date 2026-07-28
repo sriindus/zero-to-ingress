@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hello-world-config
+  namespace: hello-world
+  labels:
+    app.kubernetes.io/name: hello-world-frontend
+data:
+  APP_MESSAGE: "Hello World"
+  APP_ENV: "kubernetes"
+  PORT: "3000"

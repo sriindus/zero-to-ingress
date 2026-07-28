@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: hello-world
+
+resources:
+  - namespace.yaml
+  - serviceaccount.yaml
+  - configmap.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+  - hpa.yaml
+  - poddisruptionbudget.yaml
+
+commonLabels:
+  app.kubernetes.io/part-of: hello-world
+  app.kubernetes.io/managed-by: kustomize
+
+# `kustomize edit set image` in the pipeline rewrites this per build.
+images:
+  - name: ghcr.io/OWNER/hello-world-frontend
+    newTag: latest

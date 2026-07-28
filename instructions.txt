@@ -1,0 +1,8 @@
+1) I want to build a front end application using node js 
+2) I want to build this as a hello-world application for now 
+3) I want to deploy this onto a kubernetes cluster
+4) I also want to create a repo in github and store the code there 
+5) Create docker image file for some linux image 
+6) Create all manifest files required to deploy this as a containerized application with a proper ingress and kubernetes service setup
+7) Please make sure to use all open source code for this project
+8) We need to also think about deploying this through a pipeline , we may need jenkins setup as well for the same
