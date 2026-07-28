@@ -331,3 +331,8 @@ kubectl -n ingress-nginx logs -l app.kubernetes.io/component=controller
 - **`ImagePullBackOff`** — the image isn't pushed yet, or a pull secret is missing for
   the private GHCR package.
 - **HPA shows `<unknown>`** — install metrics-server.
+
+## License
+
+[MIT](LICENSE) — use it, fork it, modify it. Every dependency is open source too; see the
+table at the top.
