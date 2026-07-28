@@ -10,9 +10,11 @@ behind an nginx ingress, and shipped by a Jenkins pipeline. Every component is o
 | Base image | `node:22-alpine` | MIT / Alpine (BSD-ish) |
 | Init | tini | MIT |
 | Orchestration | Kubernetes + Kustomize | Apache-2.0 |
+| Packaging | Helm 3 | Apache-2.0 |
 | Ingress | ingress-nginx | Apache-2.0 |
+| Autoscaling metrics | metrics-server | Apache-2.0 |
 | CI/CD | Jenkins LTS | MIT |
-| Local cluster | kind | Apache-2.0 |
+| Local cluster | kind + colima | Apache-2.0 / MIT |
 
 ## Layout
 
@@ -23,12 +25,21 @@ app/                    Node.js front end (Express + static assets)
   test/                 node:test suite (no extra test deps)
 Dockerfile              Multi-stage Alpine build, non-root, read-only rootfs
 docker-compose.yml      Run the production image locally
-k8s/                    Namespace, ServiceAccount, ConfigMap, Deployment,
-                        Service, Ingress, HPA, PDB, kustomization
+k8s/                    Plain manifests: Namespace, ServiceAccount, ConfigMap,
+                        Deployment, Service, Ingress, HPA, PDB, kustomization
+helm/                   The same app as a Helm chart (values-driven)
+  hello-world-frontend/ Chart.yaml, values.yaml, templates/
+  values-prod.yaml      Example production overrides
 Jenkinsfile             test -> build -> push -> deploy -> smoke test
 jenkins/                Dockerfile + compose to run a Jenkins controller locally
-scripts/                build.sh, deploy.sh, kind-cluster.sh, github-init.sh
+scripts/                build.sh, deploy.sh, helm-deploy.sh, kind-cluster.sh,
+                        github-init.sh
 ```
+
+**Two deployment paths, deliberately.** [k8s/](k8s/) is the readable, no-tooling
+version — good for learning and for `kubectl apply -k`. [helm/](helm/) is the
+parameterized version for promoting one artifact across environments. They render
+functionally identical resources; see [Manifests vs Helm](#manifests-vs-helm).
 
 ## Coordinates
 
@@ -113,10 +124,92 @@ kubectl -n hello-world create secret docker-registry ghcr-pull \
 - **Service** — ClusterIP on port 80 → container port 3000.
 - **Ingress** — `ingressClassName: nginx`, host-based routing, TLS block ready to
   uncomment once cert-manager is installed.
-- **HPA** — scales 2→6 pods at 70% CPU (needs metrics-server in the cluster).
+- **HPA** — scales 2→6 pods at 70% CPU. `kind-cluster.sh` installs metrics-server, without
+  which the HPA reads `cpu: <unknown>` and never scales.
 - **PodDisruptionBudget** — keeps at least 1 pod up during node drains.
 
-## 4. Push to GitHub
+## 4. Or deploy with Helm
+
+The chart deploys the same app from the same image; pick whichever fits. The manifests
+are not going anywhere.
+
+```bash
+brew install helm
+
+# Release name matches the chart name on purpose: it collapses the generated
+# resource names to "hello-world-frontend" instead of stuttering.
+helm upgrade --install hello-world-frontend helm/hello-world-frontend \
+  --namespace hello-world --create-namespace \
+  --set image.tag=dev --wait
+
+helm test hello-world-frontend -n hello-world    # curls /api/hello from inside the cluster
+```
+
+Or use the wrapper, which does the install and the tests together:
+
+```bash
+./scripts/helm-deploy.sh                              # defaults
+IMAGE_TAG=abc1234 ./scripts/helm-deploy.sh            # pin a build
+VALUES=helm/values-prod.yaml ./scripts/helm-deploy.sh # environment overrides
+DRY_RUN=1 ./scripts/helm-deploy.sh                    # render and validate only
+```
+
+Everyday operations:
+
+```bash
+helm diff upgrade hello-world-frontend helm/hello-world-frontend   # needs helm-diff plugin
+helm history hello-world-frontend -n hello-world
+helm rollback hello-world-frontend 1 -n hello-world
+helm uninstall hello-world-frontend -n hello-world
+```
+
+### Values worth knowing
+
+Full list with comments in [helm/hello-world-frontend/values.yaml](helm/hello-world-frontend/values.yaml).
+
+| Value | Default | Notes |
+| --- | --- | --- |
+| `image.tag` | `""` | Falls back to `Chart.appVersion`. CI sets this per build. |
+| `replicaCount` | `2` | **Ignored when `autoscaling.enabled`** — see the footgun below. |
+| `autoscaling.enabled` | `true` | Omits `spec.replicas` so the HPA owns the count. |
+| `ingress.hosts[0].host` | `hello-world.local` | Set to your real domain. |
+| `ingress.tls` | `[]` | Fill in with cert-manager for HTTPS. |
+| `config.appMessage` | `Hello World` | Rendered into the ConfigMap. |
+| `restartOnConfigChange` | `true` | Checksum annotation rolls pods on config edits. |
+| `preStopSleepSeconds` | `5` | Ingress drain window. `0` disables. |
+| `imagePullSecrets` | `[]` | `[{name: ghcr-pull}]` for a private package. |
+
+> **Footgun worth knowing.** With `autoscaling.enabled: true` the chart omits
+> `spec.replicas` so Helm and the HPA don't fight on every upgrade. On a cluster with no
+> metrics source the HPA can't act, so you get **1 pod, not 2**. Either install
+> metrics-server or deploy with `--set autoscaling.enabled=false --set replicaCount=2`.
+
+### Manifests vs Helm
+
+Rendered output was compared field by field. Everything functional matches: rollout
+strategy, all three probes, both security contexts, resources, volumes, topology spread,
+service ports, ingress rules, ConfigMap data, HPA thresholds, PDB. Three intentional
+differences:
+
+| | `k8s/` | `helm/` |
+| --- | --- | --- |
+| ConfigMap name | `hello-world-config` | release-scoped, `hello-world-frontend` |
+| Ingress backend port | by name (`http`) | by number (`80`) — Helm convention |
+| `spec.replicas` | `2`, explicit | omitted, HPA owns it |
+
+Verify for yourself:
+
+```bash
+kubectl kustomize k8s/ > /tmp/raw.yaml
+helm template hello-world-frontend helm/hello-world-frontend -n hello-world > /tmp/helm.yaml
+diff <(grep -v 'app.kubernetes.io\|helm.sh' /tmp/raw.yaml) \
+     <(grep -v 'app.kubernetes.io\|helm.sh' /tmp/helm.yaml)
+```
+
+Don't run both into the same namespace — the object names collide and Helm will refuse to
+adopt resources it didn't create.
+
+## 5. Push to GitHub
 
 The repo exists and `origin` is already configured, so this is just an auth question.
 Store the token in the macOS keychain — never in a file inside the repo, and never in a
@@ -154,7 +247,7 @@ scratch, for the next project.
 A fine-grained token works too: **Contents: read/write** on this repo, plus
 **Packages: read/write** at the account level.
 
-## 5. Jenkins pipeline
+## 6. Jenkins pipeline
 
 Run a controller locally (Docker-outside-of-Docker, so it builds with your host daemon):
 
@@ -186,6 +279,19 @@ Create a **Multibranch Pipeline** job pointed at your GitHub repo. Jenkins finds
 6. **Smoke Test** — in-cluster `curl` against `/api/hello` (main only)
 
 For webhook builds, point GitHub at `http://<jenkins-host>/github-webhook/`.
+
+The pipeline deploys with kustomize. [jenkins/Dockerfile](jenkins/Dockerfile) also
+installs `helm`, so switching the deploy stage to the chart is just a matter of replacing
+that stage's shell body:
+
+```groovy
+sh '''
+  helm upgrade --install hello-world-frontend helm/hello-world-frontend \
+    --namespace "$K8S_NAMESPACE" --create-namespace \
+    --set image.tag="$IMAGE_TAG" --wait --timeout 180s
+  helm test hello-world-frontend --namespace "$K8S_NAMESPACE"
+'''
+```
 
 If your Jenkins itself runs in Kubernetes, swap the Docker build stage for
 [Kaniko](https://github.com/GoogleContainerTools/kaniko) or

@@ -8,6 +8,7 @@
 **/coverage
 **/test
 k8s
+helm
 jenkins
 scripts
 docs

@@ -1,0 +1,32 @@
+{{- /* Run with: helm test <release> — verifies the Service actually answers. */ -}}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "hello-world-frontend.fullname" . }}-test-connection"
+  labels:
+    {{- include "hello-world-frontend.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: curl
+      image: curlimages/curl:8.11.1
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+      args:
+        - -fsS
+        - --max-time
+        - "10"
+        - http://{{ include "hello-world-frontend.fullname" . }}:{{ .Values.service.port }}/api/hello

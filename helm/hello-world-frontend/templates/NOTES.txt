@@ -1,0 +1,30 @@
+{{ .Chart.Name }} {{ .Chart.AppVersion }} deployed as release "{{ .Release.Name }}" in namespace "{{ .Release.Namespace }}".
+
+Image: {{ include "hello-world-frontend.image" . }}
+{{ if .Values.autoscaling.enabled -}}
+Replicas: autoscaled {{ .Values.autoscaling.minReplicas }}-{{ .Values.autoscaling.maxReplicas }} at {{ .Values.autoscaling.targetCPUUtilizationPercentage }}% CPU (needs metrics-server)
+{{- else -}}
+Replicas: {{ .Values.replicaCount }} (fixed)
+{{- end }}
+
+Wait for the rollout:
+  kubectl -n {{ .Release.Namespace }} rollout status deployment/{{ include "hello-world-frontend.fullname" . }}
+
+Reach the app:
+{{- if .Values.ingress.enabled }}
+{{- range $host := .Values.ingress.hosts }}
+{{- range .paths }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $host.host }}{{ .path }}
+
+  On kind, the ingress is published on a host port (8080 by default), and any
+  host entry is optional since the Host header is what routes:
+    curl -H 'Host: {{ $host.host }}' http://127.0.0.1:8080{{ .path }}api/hello
+{{- end }}
+{{- end }}
+{{- else if contains "ClusterIP" .Values.service.type }}
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "hello-world-frontend.fullname" . }} 8080:{{ .Values.service.port }}
+  then open http://127.0.0.1:8080
+{{- end }}
+
+Verify it end to end:
+  helm test {{ .Release.Name }} -n {{ .Release.Namespace }}

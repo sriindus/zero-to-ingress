@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "hello-world-frontend.fullname" . }}
+  labels:
+    {{- include "hello-world-frontend.labels" . | nindent 4 }}
+data:
+  APP_MESSAGE: {{ .Values.config.appMessage | quote }}
+  APP_ENV: {{ .Values.config.appEnv | quote }}
+  PORT: {{ .Values.containerPort | quote }}

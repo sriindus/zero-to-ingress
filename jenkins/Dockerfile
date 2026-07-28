@@ -33,6 +33,16 @@ RUN set -eux; \
       | tar -xz -C /usr/local/bin kustomize; \
     kustomize version
 
+# helm, so the deploy stage can use either the manifests or the chart
+ARG HELM_VERSION=3.16.3
+RUN set -eux; \
+    arch="$(dpkg --print-architecture)"; \
+    curl -fsSL "https://get.helm.sh/helm-v${HELM_VERSION}-linux-${arch}.tar.gz" \
+      | tar -xz -C /tmp; \
+    mv "/tmp/linux-${arch}/helm" /usr/local/bin/helm; \
+    rm -rf "/tmp/linux-${arch}"; \
+    helm version --short
+
 # Pre-install the plugins the Jenkinsfile depends on
 COPY plugins.txt /usr/share/jenkins/ref/plugins.txt
 RUN jenkins-plugin-cli --plugin-file /usr/share/jenkins/ref/plugins.txt

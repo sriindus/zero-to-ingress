@@ -1,0 +1,50 @@
+# Example production overrides:
+#   helm upgrade --install hello-world helm/hello-world-frontend \
+#     -n hello-world --create-namespace \
+#     -f helm/values-prod.yaml --set image.tag=$GIT_SHA
+
+image:
+  pullPolicy: Always
+
+config:
+  appEnv: production
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 12
+  targetCPUUtilizationPercentage: 60
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 96Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: hello.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: hello-world-frontend-tls
+      hosts:
+        - hello.example.com
+
+# Private GHCR package? Create the secret first:
+#   kubectl -n hello-world create secret docker-registry ghcr-pull \
+#     --docker-server=ghcr.io --docker-username=sriindus --docker-password=$PAT
+# imagePullSecrets:
+#   - name: ghcr-pull

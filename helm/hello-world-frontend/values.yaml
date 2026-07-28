@@ -1,0 +1,147 @@
+# Default values for hello-world-frontend.
+# Override with `-f my-values.yaml` or `--set key=value`.
+
+# Ignored when autoscaling.enabled is true — the HPA owns the replica count then.
+replicaCount: 2
+
+image:
+  repository: ghcr.io/sriindus/hello-world-frontend
+  pullPolicy: IfNotPresent
+  # Defaults to .Chart.appVersion when empty. CI sets this per build.
+  tag: ""
+
+# For a private GHCR package: [{name: ghcr-pull}]
+imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  # The app calls no Kubernetes APIs, so it needs no token.
+  automount: false
+  annotations: {}
+  # Generated from the release name when empty.
+  name: ""
+
+# Rendered into a ConfigMap and injected via envFrom.
+config:
+  appMessage: "Hello World"
+  appEnv: "kubernetes"
+
+# Container listen port. Referenced by the probes and the Service.
+containerPort: 3000
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  port: 80
+  annotations: {}
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-body-size: 1m
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: hello-world.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: hello-world-frontend-tls
+  #    hosts:
+  #      - hello-world.local
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 300m
+    memory: 192Mi
+
+# Paths are served by the app; see app/server.js.
+probes:
+  startup:
+    enabled: true
+    path: /healthz
+    periodSeconds: 2
+    failureThreshold: 30
+  liveness:
+    enabled: true
+    path: /healthz
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    path: /readyz
+    initialDelaySeconds: 3
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+  # targetMemoryUtilizationPercentage: 80
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+  # maxUnavailable: 1
+
+deploymentStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+# Seconds to keep serving after SIGTERM, so the ingress can drop this pod
+# from its endpoint list before the process exits. Set to 0 to disable.
+preStopSleepSeconds: 5
+terminationGracePeriodSeconds: 30
+
+# Spread replicas across nodes; ScheduleAnyway so single-node clusters still work.
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    # labelSelector is injected by the template
+
+# Restart pods when the ConfigMap changes. Turn off for strict GitOps diffs.
+restartOnConfigChange: true
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+extraEnv: []
+#  - name: FEATURE_FLAG
+#    value: "on"
+
+extraVolumes: []
+extraVolumeMounts: []

@@ -44,6 +44,22 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/cont
 kubectl -n ingress-nginx wait --for=condition=ready pod \
   --selector=app.kubernetes.io/component=controller --timeout=180s
 
+# Without this the HPA reads "cpu: <unknown>" and never scales. The Helm chart omits
+# spec.replicas so the HPA owns the count — on a cluster with no metrics source that
+# leaves the deployment stuck at 1 pod.
+if [[ "${METRICS_SERVER:-1}" == "1" ]]; then
+  echo "==> installing metrics-server"
+  kubectl apply -f "https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.7.2/components.yaml"
+  # kind's kubelets serve self-signed certs, which metrics-server rejects by default.
+  # Guarded so re-running the script doesn't append the flag twice.
+  if ! kubectl -n kube-system get deployment metrics-server \
+       -o jsonpath='{.spec.template.spec.containers[0].args}' | grep -q kubelet-insecure-tls; then
+    kubectl -n kube-system patch deployment metrics-server --type=json \
+      -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+  fi
+  kubectl -n kube-system rollout status deployment/metrics-server --timeout=180s
+fi
+
 echo "==> building and loading $IMAGE_REPO:$IMAGE_TAG"
 docker build -t "$IMAGE_REPO:$IMAGE_TAG" -f Dockerfile .
 kind load docker-image "$IMAGE_REPO:$IMAGE_TAG" --name "$CLUSTER"
