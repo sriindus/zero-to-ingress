@@ -106,15 +106,9 @@ kubectl -n hello-world rollout status deployment/hello-world-frontend
 kubectl -n hello-world get pod,svc,ingress
 ```
 
-If your cluster pulls from a private registry, add the pull secret:
-
-```bash
-kubectl -n hello-world create secret docker-registry ghcr-pull \
-  --docker-server=ghcr.io --docker-username=YOUR_USER --docker-password=YOUR_PAT
-# then add to k8s/deployment.yaml under spec.template.spec:
-#   imagePullSecrets:
-#     - name: ghcr-pull
-```
+Nothing here needs registry credentials if the GHCR package is public, which is the
+recommended setup — see [Credentials](#credentials-what-each-job-actually-needs) for the
+private-package alternative.
 
 ### What the manifests give you
 
@@ -211,9 +205,20 @@ adopt resources it didn't create.
 
 ## 5. Push to GitHub
 
-The repo exists and `origin` is already configured, so this is just an auth question.
-Store the token in the macOS keychain — never in a file inside the repo, and never in a
-shell command you'd rather not leave in `~/.zsh_history`:
+The repo exists and `origin` is already configured, so this is only an auth question.
+
+**Use SSH, not a token.** There's no expiry to track, no scope to over-grant, and the key
+is revocable on its own:
+
+```bash
+ssh-keygen -t ed25519 -C "laptop"
+gh ssh-key add ~/.ssh/id_ed25519.pub          # or paste it at github.com/settings/keys
+git remote set-url origin git@github.com:sriindus/zero-to-ingress.git
+git push -u origin main
+```
+
+Over HTTPS instead, put the token in the macOS keychain — never in a file in the repo, and
+never in a command that lands in `~/.zsh_history`:
 
 ```bash
 git config --global credential.helper osxkeychain
@@ -224,28 +229,61 @@ git push -u origin main
 
 The keychain caches it after the first push, so later pushes are silent.
 
-If you prefer the GitHub CLI (also handy for release and PR work later):
+For `gh` itself, prefer the browser flow over pasting a token — you end up with a
+revocable OAuth grant instead of a credential to manage:
 
 ```bash
-brew install gh
-gh auth login                                # choose HTTPS, paste the token when asked
-gh auth setup-git                            # makes gh the git credential helper
-git push -u origin main
+gh auth login          # choose "Login with a web browser"
 ```
 
 [scripts/github-init.sh](scripts/github-init.sh) handles the create-and-push case from
 scratch, for the next project.
 
-### Token scopes
+### Credentials: what each job actually needs
 
-| Scope | Needed for |
-| --- | --- |
-| `repo` | pushing this repository |
-| `write:packages` | pushing the container image to GHCR |
-| `read:packages` | letting the cluster pull the image |
+Because this repo is public, most of these need nothing at all. One token, in one place,
+is enough for the whole pipeline.
 
-A fine-grained token works too: **Contents: read/write** on this repo, plus
-**Packages: read/write** at the account level.
+| Job | Credential | Notes |
+| --- | --- | --- |
+| `git push` from your laptop | **SSH key** | No token, no expiry. See above. |
+| Jenkins clones the repo | **none** | Public repo — anonymous HTTPS clone works. |
+| Jenkins pushes to GHCR | **classic PAT, `write:packages`** | The only token required. |
+| Cluster pulls the image | **none** | Make the package public; public packages pull anonymously. |
+
+[GitHub Packages only supports classic tokens][ghcr-auth] — fine-grained tokens do not
+cover Packages, so this one place can't be fine-grained. Keep it narrow instead:
+
+- Scopes: `write:packages` and `read:packages`. **Not** `repo`, not `workflow`, not
+  anything under `admin:`.
+- Set a 90-day expiry. Never "no expiration".
+- Name it `jenkins-ghcr` so the last-used column on
+  [github.com/settings/tokens](https://github.com/settings/tokens) means something.
+- It lives in the Jenkins `ghcr-credentials` credential and nowhere else.
+
+Be aware of the blast radius: a classic `write:packages` token can write **every** package
+on the account, not just this one. That's inherent to classic scopes and the reason for the
+short expiry. On a real project, a dedicated bot account holding the CI token keeps a CI
+leak away from your personal identity.
+
+After the first image push, make the package public at
+`github.com/users/sriindus/packages/container/hello-world-frontend/settings`. The cluster
+then needs no pull secret, and the `ImagePullBackOff` failure mode disappears entirely.
+
+If you keep the package private instead, the cluster needs a read-only token:
+
+```bash
+kubectl -n hello-world create secret docker-registry ghcr-pull \
+  --docker-server=ghcr.io --docker-username=sriindus --docker-password=$READ_ONLY_PAT
+# manifests: add imagePullSecrets to k8s/deployment.yaml
+# helm:      --set 'imagePullSecrets[0].name=ghcr-pull'
+```
+
+One more storage note: `docker login` writes credentials to `~/.docker/config.json` as
+**base64, which is encoding and not encryption**. Add `"credsStore": "osxkeychain"` to that
+file to keep them in the keychain instead.
+
+[ghcr-auth]: https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry
 
 ### Repository protections in effect
 
@@ -296,8 +334,15 @@ Then add two credentials under **Manage Jenkins → Credentials**:
 
 | ID | Kind | Contents |
 | --- | --- | --- |
-| `ghcr-credentials` | Username with password | GitHub user + PAT with `write:packages` |
+| `ghcr-credentials` | Username with password | `sriindus` + the `jenkins-ghcr` classic PAT ([scopes](#credentials-what-each-job-actually-needs)) |
 | `kubeconfig` | Secret file | your cluster's kubeconfig |
+
+No git credential is needed — the repo is public, so Jenkins clones it anonymously. Leave
+the credential field empty when configuring the job source.
+
+Both of these are secret material at rest: Jenkins encrypts `credentials.xml` with a key
+under `$JENKINS_HOME/secrets/`, so a backup of the `jenkins_home` volume carries the token
+and the kubeconfig together. Treat that volume accordingly.
 
 Create a **Multibranch Pipeline** job pointed at your GitHub repo. Jenkins finds the
 `Jenkinsfile` automatically and runs:
